@@ -89,6 +89,94 @@ Before moving on, it is worth pointing out a few smaller issues with the provena
   This *usually* works, at least as far as relating predicted input to predicted output datasets, but only because our ``QuantumGraph`` generation algorithm is based on data ID commonality; some other ``QuantumGraph`` generation algorithm that is equally valid for execution may not, or may have important exceptions.
   It also fails when a ``CHAINED`` collection includes a "merge" of two output ``RUN`` collections that have conflicting datasets (i.e. they have same dataset type and data ID); dataset lookup then uses the order in which those ``RUN`` collections appear in the ``CHAINED`` collection to resolve the conflict, but this may not correspond to what was actually used as an input, and in fact more than one of the conflictig datasets may have been used as inputs (to different quanta).
 
+Saving complete quantum provenance
+==================================
+
+Representing executed quanta in Registry
+----------------------------------------
+
+TODO.
+
+Sketch the schema, describe predicted/available/actual input and predicted/actual output distinctions.
+Plan to use UUIDs, even for predicted-only datasets.
+Need to figure out how to work empty-data-ID datasets in.
+
+Recording provenance during execution
+-------------------------------------
+
+TODO:
+
+- Write predicted QG to files or Redis then write new per-quantum output files or extend info in Redis; consider this storage to be in repo, but in a third sibling to Registry and Datastore rather than either.
+- Bring home provenance to Registry when job completes and datasets are also brought home.
+- Defer most of this description to another technote.
+
+Interfaces for querying quantum provenance
+------------------------------------------
+
+TODO:
+
+- Support getting QG given (all optional): input DatasetRef/DatasetType/Task/Quantum, output DatasetRef/DatasetType/Task/Quantum, collections all datasets or quanta must be in.
+- Need to think about whether QG is well-defined for all argument combinations, and what arguments really mean; "input" and "outputs" are only well-defined for linear graphs, but there are probably definitions with that limiting behavior we can assume.
+- Need to have options for minimal (actual inputs/outputs only) or original (predicted inputs/outputs).
+- Everything else we need to do is convenience methods on that QG?
+- Need to be able to fetch that QG without having Tasks importable.
+
+Intentionally inexact reproduction
+----------------------------------
+
+TODO:
+
+- Given existing QG, user wants to make some modifications and get a similar QG.
+- Change datasets by searching a new collection search path, a new repo, or even the previous collections (since they may have changed), keeping data IDs and dataset types.
+- Prune out inputs not actually used or outputs not actually produced (recursing to quanta).
+- Change configuration, assuming or asserting that this does not change the connections.
+- Change software versions, assuming or asserting that this does not change the connections.
+
+
+Addressing Provenance Working Group Recommendations
+===================================================
+
+TODO: Try to cover every middleware-relevant recommendation from DMTN-185 somewhere in this secetion.
+
+Recommendations relevant to quantum provenance
+----------------------------------------------
+
+TODO:
+
+- List recommendations from DMTN-185 that earlier sections address, call out subtleties.
+- Call out REQ-PTK-005 (URIs in PipelineTask provenance) as something we won't do, at least not directly, in that you can ask for a URI given a UUID, but it doesn't make sense to put the URI in the provenance tables or even demand that all Datastores use URIs at all.
+
+EFD-Butler linkage
+------------------
+
+TODO:
+
+- If it lands in the headers, it *could* land in the exposure table.
+- Everything else from EFD that goes in butler should be written or ingested as a per-exposure dataset.
+- Could use an opaque-table datastore if we wanted to (someday) make it possible to include these things in Registry queries.
+- Make sure this is consistent with DMTN-185.
+- Make sure this is consistent with LDM-556.
+
+Metrics linkage
+---------------
+
+TODO:
+
+- If metrics are measured by PipelineTasks, linkage to everything else is done.
+- Use opaque-table Datastore if we want them in Registry queries.
+- Also consider (write-only?) InfluxDB datastore.
+- Defer to other technote.
+
+Saving provenance in dataset files
+----------------------------------
+
+TODO:
+
+- Sketch hook on Formatter that is given metadata to write if it can and discard if it can't.
+- On `put`, pass metadata to Formatter with UUID of the dataset, and best (conservative) guess at UUIDs of actual inputs to this quantum.
+- THIS MIGHT DIFFER FROM FINAL ACTUAL INPUTS, because the quantum isn't necessarily done yet (though it often will be).  Or should we record predicted/available inputs instead to avoid discrepancy?
+
+
 .. Add content here.
 .. Do not include the document title (it's automatically added from metadata.yaml).
 
