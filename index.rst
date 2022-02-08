@@ -80,7 +80,13 @@ This includes two new fields for the existing ``dataset`` table:
 
 The new ``task``, ``quantum``, and ``quantum_tags_*`` tables behave analogously to the ``dataset_type``, ``dataset``, and ``dataset_tag_*`` tables.
 Like datasets, quanta may be associated with collections, are "owned" by exactly one RUN collection, and there may be only one quantum with a particular data ID and task in each collection.
-Tasks are not associated with a particular collection, and are uniquely identified by their label.\ [#unique_labels]_
+Tasks are not associated with a particular collection, and are uniquely identified by their label.
+
+.. note::
+
+   It may make more sense to make task labels non-unique, except within a particular collection, in order to allow the label to have different meanings in different pipelines or change its definition more easily over time.
+   This would analogous to the `RFC-804 <https://jira.lsstcorp.org/browse/RFC-804>`_ proposal for dataset type non-uniqueness, however, and as long as dataset type names *are* globally unique, and task labels are used to produce dataset type names (e.g. ``<label>_metadata`` or ``<label>_config``), there's relatively little to be gained from making label uniqueness apply only within a collection.
+   The definition of those dataset types (which must be globally unique) would still effectively force global label uniqueness.
 
 Links between quanta and their inputs datasets are stored in the ``quantum_inputs`` table.
 This is a standard many-to-many join table with one extension: the ``actually_used`` flag.
@@ -94,10 +100,6 @@ Note that there are actually three possible states for a quantum input dataset r
 
 A dataset may not have ``quantum_input.actually_used`` if ``dataset.actually_produced`` is ``false``.
 Note that these states build on each other; we say e.g. "predicted *only*" when an input is not available (and by extension, not actual).
-
-.. [#unique_labels] It may make more sense to make task labels non-unique, except within a particular collection, in order to allow the label to have different meanings in different pipelines or change its definition more easily over time.
-   This would analogous to the `RFC-804 <https://jira.lsstcorp.org/browse/RFC-804>`_ proposal for dataset type non-uniqueness, however, and as long as dataset type names *are* globally unique, and task labels are used to produce dataset type names (e.g. ``<label>_metadata`` or ``<label>_config``, there's relatively little to be gained from making label uniqueness apply only within a collection.
-   The definition of those dataset types (which must be globally unique) would still effectively force global label uniqueness.
 
 Open questions and variants
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
