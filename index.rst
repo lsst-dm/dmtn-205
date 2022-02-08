@@ -60,20 +60,112 @@ Saving complete quantum provenance
 Representing executed quanta in Registry
 ----------------------------------------
 
-TODO.
+Proposed tables for storing quantum-based provenance in the registry database are shown in the diagram below [`source <https://dbdiagram.io/d/61fff3cc85022f4ee5479e62>`_]:
 
-Sketch the schema, describe predicted/available/actual input and predicted/actual output distinctions.
-Plan to use UUIDs, even for predicted-only datasets.
-Need to figure out how to work empty-data-ID datasets in.
+.. image:: /_static/tables.png
+   :target: https://dbdiagram.io/d/61fff3cc85022f4ee5479e62
+   :alt: registry provenance tables
+
+This includes two new fields for the existing ``dataset`` table:
+
+``quantum_id``
+  The quantum that produced this dataset (may be null).
+  Because a quantum can be produced by at most one quantum, we do not need a separate join table for this relationship.
+  If provenance data is loaded into the database as proposed in :ref:`the next section <recording-provenance>`, this information will be available when the dataset is first inserted, so no separate update is needed.
+
+``actually_produced``
+  Whether this dataset was actually written to any datastore (defaults to `true`).
+  A dataset for which ``actually_produced`` is ``false`` should never appear in *any* ``Datastore``, and the dataset record exists only because the dataset was predicted to exist when a ``QuantumGraph`` was generated.
+  A value of ``true`` does not guarantee continued existence in any ``Datastore``, but this this flag is still expected to provide an important optimization in queries for datasets that must be present in ``Datastores``, especially since most other reasons for dataset nonexistence allow checks to be implemented more efficiently by policy shortcuts (e.g. "this ``Datastore`` cannot have this ``PVI`` because it never has any ``PVIs``").
+
+The new ``task``, ``quantum``, and ``quantum_tags_*`` tables behave analogously to the ``dataset_type``, ``dataset``, and ``dataset_tag_*`` tables.
+Like datasets, quanta may be associated with collections, are "owned" by exactly one RUN collection, and there may be only one quantum with a particular data ID and task in each collection.
+Tasks are not associated with a particular collection, and are uniquely identified by their label.\ [#unique_labels]_
+
+Links between quanta and their inputs datasets are stored in the ``quantum_inputs`` table.
+This is a standard many-to-many join table with one extension: the ``actually_used`` flag.
+This may be set to ``false`` by tasks to indicate that the input dataset was not used *at all*, i.e. running the quantum without the dataset would have no effect on the results.
+Tasks that do not opt-in to this fine-grained reporting will be assumed to use all inputs given to them.
+Note that there are actually three possible states for a quantum input dataset relationship, when the ``dataset.actually_produced`` flag is considered as well:
+
+- a dataset is a "predicted" input if a ``quantum_input`` row exists at all;
+- a dataset is also an "available" input if ``dataset.actually_produced`` is ``true``;
+- a dataset is also an "actual" input if ``quantum_input.actually_used`` is ``true``.
+
+A dataset may not have ``quantum_input.actually_used`` if ``dataset.actually_produced`` is ``false``.
+Note that these states build on each other; we say e.g. "predicted *only*" when an input is not available (and by extension, not actual).
+
+.. [#unique_labels] It may make more sense to make task labels non-unique, except within a particular collection, in order to allow the label to have different meanings in different pipelines or change its definition more easily over time.
+   This would analogous to the `RFC-804 <https://jira.lsstcorp.org/browse/RFC-804>`_ proposal for dataset type non-uniqueness, however, and as long as dataset type names *are* globally unique, and task labels are used to produce dataset type names (e.g. ``<label>_metadata`` or ``<label>_config``, there's relatively little to be gained from making label uniqueness apply only within a collection.
+   The definition of those dataset types (which must be globally unique) would still effectively force global label uniqueness.
+
+Open questions and variants
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+InitInput and InitOutput datasets
+"""""""""""""""""""""""""""""""""
+
+This schema does not provide a dedicated solution for associating tasks with the InitInput and InitOutput datasets they may consume and produce during construction.
+Our preferred solution is to introduce a special "init" quantum for each task.
+This quantum's inputs would be the InitInputs for the task, and its outputs would be the InitOutputs for the task.
+It would have an empty data ID instead of the usual dimensions for the task.
+
+This approach works best if it is reflected in the in-memory ``QuantumGraph`` data structure and the execution model; these special init quanta would be executed prior to the execution of any of their task's usual quanta, which would be handled naturally by considering all task InitInputs to also be regular inputs of the task's regular quanta.
+This is actually more consistent with how BPS already treats the init job as just another node in its derived graphs, but with one init node per task, rather than one init node for the whole submission.
+Having one init quantum per task hints at a solution to another problem: if we write a different software version dataset for each (per-task) init quantum, instead of one for the entire RUN, each can be handled as a regular, write-once dataset, instead of needing to simulate update-in-place behavior.
+
+No predicted-only datasets
+""""""""""""""""""""""""""
+
+Instead of adding the ``dataset.actually_produced`` column to the ``dataset`` table, we could ignore predicted-only datasets entirely in provenance.
+This simplifies the schema and avoids the problem how to query only for datasets that were actually produced.
+These predictions will still appear in ``QuantumGraph`` objects prior to execution, so by dropping them we make it impossible to reconstruct from provenance the full graph that was e.g. submitted to a batch system - but reproducing ``QuantumGraph`` generation is already not a guarantee of the system, because it depends on inputs (e.g. collections) that change over time.
+We would retain the ability to exactly re-execute any particular quantum and reproduce all output datasets however, because by definition these datasets are those that cannot have affected the results of the processing that did occur.
+
+Reverse-lookups for special datasets
+""""""""""""""""""""""""""""""""""""
+
+The provenance tables in the original proposal do not contain any foreign-key columns for the datasets that store important provenance, such as software versions, task configuration, quantum metadata, or quantum logs.
+Instead, these connections rely on dataset type conventions and RUN collection membership, e.g. "the configuration for the task ``<label>`` is in the ``<label>_config`` dataset in the same RUN collection," essentially the same as it is now.
+This avoids circular dependencies between foreign keys (which require an ``UPDATE`` after each ``INSERT`` to fully populate), and it allows the set of provenance-relevant datasets to evolve without schema changes (provided some in-code scheme exists for remembering the historical conventions for provenance dataset types).
+
+It also isn't straightforward to just add dataset foreign key columns to these tables in some cases: the ``task`` table as defined here has rows that are not tied to any particular RUN collection, and hence can't hold a reference to the config dataset.
+
+.. _recording-provenance:
 
 Recording provenance during execution
 -------------------------------------
 
-TODO:
+Avoiding per-dataset or per-quantum communication with a central SQL database is absolutely critical for at-scale execution with our middleware, so the provenance described above will need to be saved to files at first and loaded into the database later.
 
-- Write predicted QG to files or Redis then write new per-quantum output files or extend info in Redis; consider this storage to be in repo, but in a third sibling to Registry and Datastore rather than either.
-- Bring home provenance to Registry when job completes and datasets are also brought home.
-- Defer most of this description to another technote.
+Most of the information we need to save is already included in the ``QuantumGraph`` produced prior to execution, especially if we include UUIDs for its predicted intermediate and output in the graph at construction.
+We are already planning to do this for other reasons, as described in the `"Quantum-backed butler" proposal in DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`_.
+Always saving the graph to a managed location during any kind of execution (not just BPS) is thus a key piece of being able to load provenance into the database later.
+
+The remaining information that is only available during/after execution of a quantum is
+
+- timing and host fields for the ``quantum`` table;
+- a record of which predicted outputs were ``actually_produced``;
+- a record of which predicted inputs were ``actually_used``.
+
+These can easily be saved to a file (e.g. JSON) written by the quantum-execution harness, and here the design ties again into the quantum-backed butler concept, which also needs to write per-quantum files in order to save datastore record data.
+Just like the provenance we wish to save here, the eventual home of those datastore records is the shared ``Registry`` database, so it is extremely natural to save them both to the same files, and upload provenance when the datasets themselves are ingested in bulk after execution completes.
+
+In fact, these per-quantum files may also help solve yet another problem; as described in `DMTN-213 <https://dmtn-213.lsst.io/>`_, our approach to multi-site processing and synchronization will probably involve metadata files that are transferred along with dataset files by Rucio, in order to ensure enough information for butler ingest is available from files alone.
+These provenance files could easily play that role as well.
+
+The quantum-backed butler design is a solution to a problem unique to at-scale batch processing, so writing the ``QuantumGraph`` and provenance files to BPS-managed locations (such as its "submit" directory) there is completely fine.
+That's not true for provenance, which we want to work regardless of how execution is performed.
+This is related to the long-running middleware goal of better integrating ``pipetask`` and BPS.
+It will probably also involve carving out a third aspect of butler (a new sibling to ``Registry`` and ``Datastore``) for ``QuantumGraph`` and provenance files, because
+
+- like ``Datastore``, this aspect would be backed by files in a shared filesystem or object store (but not necessarily the same filesystem or bucket as an associated ``Datastore``);
+- like ``Registry``, the new aspect would provide descriptive and organizational metadata for datasets, rather than hold datasets themselves, and after execution its content would be completely loaded into the ``Registry``.
+
+The full high-level design will be the subject of a future technote, but an early sketch can be found `in Confluence <https://confluence.lsstcorp.org/display/DM/Saving+per-Quantum+provenance+and+propagating+nothing-to-do+cases%2C+and+The+Future>`_.
+
+Recording provenance only when using BPS (and relying on it to manage the ``QuantumGraph`` and provenance files) in the interim seems like a good first step.
+Extending the design to include non-BPS processing may take time, but we do not anticipate it changing what happens at a low level or the appearance of persisted provenance information.
 
 Interfaces for querying quantum provenance
 ------------------------------------------
