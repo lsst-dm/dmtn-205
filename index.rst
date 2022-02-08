@@ -172,13 +172,64 @@ Extending the design to include non-BPS processing may take time, but we do not 
 Interfaces for querying quantum provenance
 ------------------------------------------
 
-TODO:
+Given the similarity between quanta and datasets in terms of table structure, a ``Registy.queryQuanta`` method analogous to ``queryDatasets`` provides a good starting point for provenance searches::
 
-- Support getting QG given (all optional): input DatasetRef/DatasetType/Task/Quantum, output DatasetRef/DatasetType/Task/Quantum, collections all datasets or quanta must be in.
-- Need to think about whether QG is well-defined for all argument combinations, and what arguments really mean; "input" and "outputs" are only well-defined for linear graphs, but there are probably definitions with that limiting behavior we can assume.
-- Need to have options for minimal (actual inputs/outputs only) or original (predicted inputs/outputs).
-- Everything else we need to do is convenience methods on that QG?
-- Need to be able to fetch that QG without having Tasks importable.
+  def queryQuanta(
+      self,
+      label: Any,
+      *,
+      collections: Any = None,
+      dimensions: Iterable[Dimension | str] | None = None,
+      dataId: DataId | None = None,
+      where: str | None = None,
+      findFirst: bool = False,
+      bind: Mapping[str, Any] | None = None,
+      check: bool = True,
+      with_inputs: Iterable[DatasetRef] | None = None,
+      with_outputs: Iterable[DatasetRef] | None = None,
+      **kwargs: Any,
+  ) -> QuantumQueryResults:
+      ...
+
+Most arguments here are exactly the same as those to ``queryDatasets``,
+with the dataset type argument replaced by a label expression identify the tasks, and two new arguments to constrain the query on particular input or output datasets.
+Like ``queryDatasets``, the return type would be a lazy-evaluation iterable, with convenience methods for conversion to ``QuantumGraph`` instance; this type could also be returned by a new ``DataCoordinateQueryResults.findQuanta`` method to more directly find quanta from a data ID query (as the ``findDatasets`` does for datasets).
+
+This interface does not provide enough functionality for most provenance queries, however - it just finds all quanta matching certain criteria, regardless of their relationships - so it is best considered way to obtain a starting point.
+For those, we envision an operation that starts with a set of quanta and traverses the graph according to certain criteria, querying the database as necessary (perhaps once per task or dataset type) and returning matching quanta as it goes::
+
+  def traverseQuanta(
+      self,
+      initial: Iterable[Quantum],
+      forward_while: Optional[str | TraversalPredicate] = None,
+      forward_until: Optional[str | TraversalPredicate] = None,
+      backward_while: Optional[str | TraversalPredicate] = None,
+      backward_until: Optional[str | TraversalPredicate] = None,
+  ) -> Iterable[Quantum]:
+      ...
+
+Traversal could proceed forward (in the same direction as execution) or backward (from outputs back to inputs) or both.
+The criteria for which quanta to traverse and return are encoded in the four predicate arguments, which are *conceptually* just boolean functions on a quantum::
+
+  class TraversalPredicate(ABC):
+
+      @abstractmethod
+      def __call__(self, quantum: Quantum) -> bool:
+          ...
+
+Traversal would be terminated in a direction whenever a ``while`` predicate evaluates to `False` (without returning that quantum) or whenever the corresponding ``until`` predicate evaluates to `True` (which does return that quantum).
+
+This simple conceptual definition of the predicate may not be possible in practice for performance reasons; traversal actually involves database queries, and while we can perform some post-query filtering in Python, we want most of the filtering to happen in the database.
+In practice, then, we may need to define an enumerated library of ``TraversalPredicates``, and perhaps define logical operations to combine them, restricted to what we can translate to SQL queries.
+Most common provenance queries could be satisfied by the following predicates and their negations (even if they cannot be combined):
+
+- whether the quantum's task label is in a given set;
+- whether any input or output dataset type is in given set;
+- whether any input or output dataset UUID is in a given set.
+
+It is worth noting here that the ``Quantum`` and ``QuantumGraph`` objects returned here are not necessarily the same types as those used prior to execution; execution adds more information that we want the provenance system to be able to return.
+Whether to actually use different types involves a lot of classic software design tradeoffs involving inheritance and container classes, and resolving it is beyond the scope of this document.
+If we do use different types, one of the most important operations on the "executed" forms will of course be transformation to a "predicted" form for reproduction.
 
 Intentionally inexact reproduction
 ----------------------------------
