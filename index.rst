@@ -192,7 +192,7 @@ TODO:
 Mapping to the IVOA provenance model
 ------------------------------------
 
-Our quantum-dataset provenance model has a straightforward mapping to the IVOA provenance model, which is also based on directed acyclic graph concepts.
+Our quantum-dataset provenance model has a straightforward mapping to the  IVOA provenance model :cite:`2020ivoa.spec.0411S`, which is also based on directed acyclic graph concepts.
 Our "dataset" corresponds to IVOA's "Entity", and our "quantum" corresponds to IVOA's "Activity".
 The fields of these concepts in the IVOA have fairly obvious mappings to the fields of our schema (unique IDs, names of dataset types and tasks, execution timespans).
 One important field that may be slightly problematic is the Entity's "location" field, which might *usually* map to a ``Datastore`` URI, but cannot in general, because our datasets may not have a URI, or may have more than one.
@@ -261,9 +261,7 @@ TODO:
 - On `put`, pass metadata to Formatter with UUID of the dataset, and best (conservative) guess at UUIDs of actual inputs to this quantum.
 - THIS MIGHT DIFFER FROM FINAL ACTUAL INPUTS, because the quantum isn't necessarily done yet (though it often will be).  Or should we record predicted/available inputs instead to avoid discrepancy?
 
-.. .. rubric:: References
+.. rubric:: References
 
-.. Make in-text citations with: :cite:`bibkey`.
-
-.. .. bibliography:: local.bib lsstbib/books.bib lsstbib/lsst.bib lsstbib/lsst-dm.bib lsstbib/refs.bib lsstbib/refs_ads.bib
-..    :style: lsst_aa
+.. bibliography:: local.bib lsstbib/books.bib lsstbib/lsst.bib lsstbib/lsst-dm.bib lsstbib/refs.bib lsstbib/refs_ads.bib
+   :style: lsst_aa
