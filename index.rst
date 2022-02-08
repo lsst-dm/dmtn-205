@@ -189,6 +189,34 @@ TODO:
 - Change configuration, assuming or asserting that this does not change the connections.
 - Change software versions, assuming or asserting that this does not change the connections.
 
+Mapping to the IVOA provenance model
+------------------------------------
+
+Our quantum-dataset provenance model has a straightforward mapping to the IVOA provenance model, which is also based on directed acyclic graph concepts.
+Our "dataset" corresponds to IVOA's "Entity", and our "quantum" corresponds to IVOA's "Activity".
+The fields of these concepts in the IVOA have fairly obvious mappings to the fields of our schema (unique IDs, names of dataset types and tasks, execution timespans).
+One important field that may be slightly problematic is the Entity's "location" field, which might *usually* map to a ``Datastore`` URI, but cannot in general, because our datasets may not have a URI, or may have more than one.
+
+The IVOA terms are more general, and we may also want to map other concepts to them as well (e.g. a BPS job may be considered another kind of Activity, and a RUN collection could be another kind of Entity).
+But none of the other potential mappings are as clear-cut or as useful as quantum-Activity and dataset-Entity.
+
+There are two natural relationships defined by IVOA between an Activity and an Entity, which map directly to the kinds of edges in our ``QuantumGraph``:
+
+- an Activity "Used" an Entity: a quantum has an "input" dataset;
+- an Entity "WasGeneratedBy" an Activity: a dataset is an "output" of a quantum.
+
+These relationships have a "role" field that is probably best populated with the string name used by a ``PipelineTask`` to refer to the ``Connection``.
+Because this role will be the same for all relationships between a particular dataset type and task, it also makes sense to use IVOA's "UsedDescription" and "GeneratedDescription" classes to define these roles in a more formal, reusable way.
+IVOA recommends certain predefined values be used for those descriptions when they apply (e.g. "Calibration" as a "UsedDescription"), which could be identified by configuration that depends on the pipeline definition.
+
+IVOA also defines a "WasInformedBy" relationship between two Activities and a "WasDerivedFrom" relationship between two Entities.
+These may be useful in collapsed views of the ``QuantumGraph`` in which datasets or quanta are elided, but in our case would always be computed from the Activity-Entity/quantum-dataset relationships, rather than meaningful in their own right.
+
+IVOA has no direct counterpart to our "predicted" vs. "available" vs "actual" categorization of quantum-dataset relationships.
+Because a relationship can have at most one associated "GeneratedDescription" or "UsedDescription", we cannot use one set of description types for the role-like information and another for this categorization.
+It seems best to simply leave this out of the IVOA view of our provenance, and possibly limit the IVOA view to "actual" relationships, since it is not expected to play a role in actually reproducing our processing.
+
+We currently have no concept that maps to IVOA's "Agent" or any of its relationships.
 
 Addressing provenance working group recommendations
 ===================================================
