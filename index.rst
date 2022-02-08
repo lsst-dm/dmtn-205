@@ -51,6 +51,9 @@ Before moving on, it is worth pointing out a few smaller issues with the provena
   This *usually* works, at least as far as relating predicted input to predicted output datasets, but only because our ``QuantumGraph`` generation algorithm is based on data ID commonality; some other ``QuantumGraph`` generation algorithm that is equally valid for execution may not have this property, or may make important exceptions.
   It also fails when a ``CHAINED`` collection includes a "merge" of two output ``RUN`` collections that have conflicting datasets (i.e. they have same dataset type and data ID); dataset lookup then uses the order in which those ``RUN`` collections appear in the ``CHAINED`` collection to resolve the conflict, but this may not correspond to what was actually used as an input, and in fact more than one of the conflictig datasets may have been used as inputs (to different quanta).
 
+- Batch execution with BPS may "cluster" multiple quanta into a single "job" to e.g. avoid overheads in acquiring compute nodes or allow local scratch space to be used for some intermediate datasets.
+  We currently have no way to store job-level provenance in a data repository, except by denormalizing it into per-quantum datasets.
+
 Saving complete quantum provenance
 ==================================
 
