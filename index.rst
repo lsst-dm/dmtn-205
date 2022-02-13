@@ -234,13 +234,30 @@ If we do use different types, one of the most important operations on the "execu
 Intentionally inexact reproduction
 ----------------------------------
 
-TODO:
+Quantum-based provenance excels at exact reproduction of previous processing runs, but it can also be used - with some limitations - to re-run processing with intentional changes.
 
-- Given existing QG, user wants to make some modifications and get a similar QG.
-- Change datasets by searching a new collection search path, a new repo, or even the previous collections (since they may have changed), keeping data IDs and dataset types.
-- Prune out inputs not actually used or outputs not actually produced (recursing to quanta).
-- Change configuration, assuming or asserting that this does not change the connections.
-- Change software versions, assuming or asserting that this does not change the connections.
+The most straightforward way to reprocess with changes is to create a completely new ``QuantumGraph``.
+The software versions and task configuration stored in per-``RUN`` datasets can be combined with the special "init" quanta for each task to reconstruct the pipelines used in a ``RUN`` exactly, and of course other versions or configurations may be used instead as desired.
+The input collections and data ID expression also typically provided as input to the ``QuantumGraph`` generation algorithm are not directly saved in our provenance schema, however, because after execution we intentionally do not draw any distinctions between quanta that may have originated in different graphs as long as their outputs land in the same ``RUN`` (and hence have the same software versions and configuration).
+Higher level tools such as BPS or a campaign managements system may nevertheless save this information in their own datasets, along with any other graph-building or per-submission information relevant for those tools.
+
+Changing software versions and configuration while keeping the input datasets and data IDs the same can be more directly accomplished using quantum-based provenance.
+The former is what happens naturally when a different version of the codebase is used to fetch and run a stored ``QuantumGraph``, while the latter can easily be expressed as mutator methods on the ``QuantumGraph`` object (or perhaps arguments to the code that transforms an already-executed provenance graph into a ready-to-run predicted graph).
+There is one large caveat: different versions and configuration can lead to different predictions for inputs and outputs for a quantum, and when applied to a full graph, this can result in some quanta being pruned either because they are no longer needed to produce desired target datasets or because it can be known in advance that they will have no work to do.
+In some cases, it should logically expand the graph instead - but if we are starting from provenance quanta and are not re-running the ``QuantumGraph`` generation algorithm in full, we cannot in general add fundamentally new quanta, though we may be able to identify ways to do so for specific use cases in the future.
+This depends on how our algorithm for ``QuantumGraph`` generation evolves; our current algorithm has essentially no way to incorporate existing quanta, but a long-planned (but long-delayed) new algorithm should be much more flexible in this regard.
+
+Changing the input collections before re-executing a ``QuantumGraph`` obtained from provenance would work in much the same way, and would have very similar limitations in the sense that pruning the graph is straightforward but expanding it is not.
+Unlike version and configuration changes, updating the graph to reflect new input collections involves querying the ``Registry``, and doing this efficiently (in particular, avoiding per-quantum queries) will make this more difficult to implement.
+
+Changing the input data ID expression while starting from quantum provenance does not make sense in the same way; the right way to think of this is that the data ID expression is instead used in performing the provenance query to fetch those quanta.
+It is worth noting that these queries are not affected by the original boundaries of the ``QuantumGraph`` objects used for production - a ``QuantumGraph`` obtained from provenance can include quanta from multiple ``RUN`` collections as well as multiple ``QuantumGraph``-generation submissions within a single ``RUN`` collection.
+
+.. note::
+
+   These multi-``RUN`` provenance ``QuantumGraphs`` cannot be translated one-to-one into runnable predicted ``QuantumGraphs``, as long as our execution model expects all writes to go into a single output ``RUN`` collection with consistent configuration and versions for all quanta within it.
+   The most straightforward way to address this would be to make the process that translates provenance graphs into predicted graphs a fundamentally one-to-many operation, requiring users to run each per-``RUN`` predicted graph on its own.
+   For unrelated reasons (e.g. RSP service outputs, user-defined processing, unusual processing for commissioning), we are considering expanding the data ID / dimensions system to allow custom data ID keys or relax the dataset type + data ID unique constraints, which would also open up new ways of saving configuration (e.g. multiple init quanta per ``RUN``, each with its own config datasets), and that may in enable execution of ``QuantumGraph`` objects with heterogeneous configuration.
 
 Mapping to the IVOA provenance model
 ------------------------------------
