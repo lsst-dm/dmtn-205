@@ -299,45 +299,168 @@ We currently have no concept that maps to IVOA's "Agent" or any of its relations
 Addressing provenance working group recommendations
 ===================================================
 
-TODO: Try to cover every middleware-relevant recommendation from DMTN-185 somewhere in this section.
+Italized bullets in this section are specific recommendations quoted from `DMTN-185 <http://dmtn-185.lsst.io>`__.
+Middleware responses are in regular text below.
 
 Recommendations relevant to quantum provenance
 ----------------------------------------------
 
-TODO:
+- *[REC-SW-3] Software provenance support should include mechanisms for capturing the versions of underlying non-Rubin software, including the operating system, standard libraries, and other tools which are needed “below” the Rubin software configuration management system. The use of community-standard mechanisms for this is strongly encouraged.*
+- *[REQ-WFL-005] Both the OS and the OS version must be recorded. This requirement may be met within the pipeline task provenance, but it is an upscope since currently, only the OS type is recorded.*
 
-- List recommendations from DMTN-185 that earlier sections address, call out subtleties.
-- Call out REQ-PTK-005 (URIs in PipelineTask provenance) as something we won't do, at least not directly, in that you can ask for a URI given a UUID, but it doesn't make sense to put the URI in the provenance tables or even demand that all Datastores use URIs at all.
+The existing software-version recording logic used in ``PipelineTask`` execution (implemented in `lsst.utils.packages`) does extend to non-Rubin software, and it does use community-standard mechanisms when possible.
+But it also relies heavily on bespoke methods for obtaining versions for certain packages, and it is unclear to what extent this is historical (i.e. predating our use of ``conda`` for the vast majority of our third-party dependencies), as well as for deciding when to use various different community-standard mechanisms.
+The code should at least be carefully reviewed for possible simplification and generalization.
 
-EFD-Butler linkage
-------------------
+- *[REQ-PTK-001] As planned, complete the recording of as-executed configuration for provenance.*
 
-TODO:
+This is already implemented.
 
-- If it lands in the headers, it *could* land in the exposure table.
-- Everything else from EFD that goes in butler should be written or ingested as a per-exposure dataset.
-- Could use an opaque-table datastore if we wanted to (someday) make it possible to include these things in Registry queries.
-- Make sure this is consistent with DMTN-185.
-- Make sure this is consistent with LDM-556.
+- *[REQ-PTK-002] As planned, complete the storage of the quantum graph for each executed Pipeline in the Butler repository.*
+
+This will be satisfied by implementing the design described in [:ref:`provenance-schema`] and [:ref:`recording-provenance`].
+
+- *[REQ-PTK-003] Code and command-line support for recomputing a specified previous data product based on stored provenance information should be provided.*
+
+This will be satisfied by implementing the design described in
+[:ref:`querying-provenance`].
+
+- *[REQ-PTK-004] A study should be made on whether W3/VO provenance ontologies are a suitable data model either for persistence or service of provenance to users.*
+
+This is discussed extensively in [:ref:`ivoa-mapping`].
+To answer the question posed here directly, mapping to the IVOA data model is entirely suitable as one way to serve provenance to users, but it is slightly lossy and should neither be our way of storing quantum provenance internally nor the only way we serve this provenance to users.
+
+- *[REQ-PTK-005] URIs (as well as DataIDs) should be recorded in Butler data collections.*
+
+**This recommendation requires clarification before we can comment on its implementation in middleware.**
+
+The butler ``Registry`` associates each dataset with a data ID and at least one collection, but collections do not store data IDs directly.
+The butler's ``Datastore`` component **may** associate a dataset with one **or more** URIs, but this is not guaranteed in general, and even when present these URIs are not always sufficient information to be able to reconstruct an in-memory dataset.
+These URIs may also use an internal form that is not usable by science users.
+
+So, while there may well be (and will generally be) URIs involved in dataset storage within butler data repositories, they do not play an important role in provenance, and while some interpretations of this recommendation are trivially satisfied by the current middleware design, these interpretations are not consistent with a recommendation relevant to provenance, and it seems more likely that the intent was both more related to provenance and is probably not satisfiable by the middleware.
+
+- *[REQ-WFL-001] Logs from running each quantum must be captured and made available from systems outside the batch processing system.*
+- *[REQ-WFL-002] Any workflow level configuration and logs must be persisted and made available from systems outside the batch processing system. This information should be associatable with specific processing runs.*
+
+The ``PipelineTask`` execution system already includes support for saving logs to butler datasets.
+That satisfies these requirements in a minimal sense, but we expect higher-level workflow tools to do a better job of saving logs (in addition or instead) using third-party tools better suited for log analysis.
+This is already the case at the IDF.
+
+- *[REQ-WFL-003] Failed quanta must be reported including where in the batch processing system the quantum was running at the time of failure.*
+
+This will be satisfied by implementing the design described in [:ref:`provenance-schema`] and [:ref:`recording-provenance`], provided the ``host`` field in the ``quantum`` table is consistent with the "where" question here.
+
+- *[REQ-WFL-004] Though no requirement exists, it should be possible to inspect, post-facto, the resource usage (CPU, memory, I/O etc.) for individual workers.*
+
+This is already implemented for provenance queries that start with the data ID of the quantum to be inspected, because these values are stored in the task metadata dataset (at a coarse level by the execution system, and optionally with more fine-grained information by the task itself).
+The rest of the design described in this document should allow this information to be connected with worker nodes.
+
+Observatory-Butler linkage
+--------------------------
+
+Possibly relevant recommendations:
+
+- *[REC-EXP-1] As planned, program details known to the scheduler (such as science programme and campaign name) should be captured by the Butler.*
+
+As long as these details are included in the FITS headers of the raw files, they can be configured to be capture by the butler and stored in the ``exposure`` dimension table.
+This is already the case for the fields used as examples in this recommendation.
+
+- *[REC-EXP-2] As planned, OCS queue submissions that result in meaningfully grouped observations should be identified as such in the Butler.*
+
+The middleware does currently read a group ID field from the raw headers and store it in the ``exposure`` table.
+We also have a ``visit``-definition scheme that interprets the group ID as a way to relate the snaps that correspond to a single visit, for on-sky science observations only (in the butler dimensions model, a ``visit`` may only be defined for on-sky data).
+
+While that makes this recommendation is formally satisfied, this approach has two (related) problems:
+
+- Using group ID to connect snaps to visits leaves us without a way to create more flexible groups of science exposures.
+- The association of group ID with visits also discourages using group ID for more flexible groups of non-science exposures, such as focus sweeps or flat sequences, or causes confusion about whether visits (or some new visit-like dimension) should be defined and used for these.
+
+It would be much better for a new snap-specific header key to be introduced and interpreted by the middleware, freeing up the group ID to have more flexible and ad-hoc definitions.
+We believe this change is already ticketed in the data acquisition systems, but the work is not yet complete.
 
 Metrics linkage
 ---------------
 
-TODO:
+- *[REC-MET-001] For metrics that can be associated with a Butler dataId, the metrics should be persisted using the Data Butler as the source of truth. The dataId associated with the metric should use the full granularity.*
+- *[REC-MET-002] Any system that uses Butler data to derive metrics should persist them in the Butler provided that the metrics are associable with a Data ID.*
 
-- If metrics are measured by PipelineTasks, linkage to everything else is done.
-- Use opaque-table Datastore if we want them in Registry queries.
-- Also consider (write-only?) InfluxDB datastore.
-- Defer to other technote.
+This is already implemented and in regular use in the ``faro`` package in particular, and is currently the only way that metrics derived from butler data are initially stored.
+It is arguable whether the butler datasets are considered the source of truth after upload to SQuaSH.
+
+- *[REC-MET-003] When lsst.verify.Job objects are exported, the exported object should include the needed information (run collection and dataId) to associate with the source of truth metric persisted with the Data Butler.*
+
+It is at least unusual for butler datasets to store their own data ID and especially their own ``RUN`` collection internally.
+It might make more sense for metric values persisted to butler data repositories to be saved as a dataset that does not have this state, and for the system that exports it to SQuaSH to combine the dataset content with the data ID and ``RUN`` collection from the ``Registry``.
+
+- *[REC-MET-005] Even if effort for implementation is not available in construction, we should develop a conceptual design for structured, semantically rich storage of metrics in the Butler.*
+
+We currently save metric measurements as individual JSON files, which is convenient for upload to SQuaSH but inconvenient for querying metric values via the butler.
+It also precludes using thresholds on metric values at criteria in ``QuantumGraph`` generation.
+A custom ``Datastore`` backed by by either the ``Registry`` "opaque table" system or SQuaSH itself (along with ``Registry`` query system extensions) would make butler queries against metrics much more convenient and efficient.
+`DMTN-203 <https://dmtn-203.lsst.io/>`__ will provide more detail on this subject.
+This will be easier if we can normalize the content in metric datasets with what is in the ``Registry`` and generally make them smaller and more consistent, in essence unifying the ``lsst.verify`` data model with the butler one:
+
+- Each ``lsst.verify.Metric`` can be mapped directly to a butler dataset type, so there should be no need for a metric measurement to store its ``Metric`` internally.
+- The opaque blobs associated with an ``lsst.verify.Measurement`` should probably be factored out into separate butler datasets with different dataset types when measurements are stored in the butler.
+- An ``lsst.verify.Job`` is a container for a group of measurements, and is probably best not mapped directly to anything stored by the butler, but a higher-level factory for ``Job`` instances that uses the butler to query for and fetch measurements and blob data may be useful, especially as a way to upload to SQuaSH.
+
+This mapping is very much preliminary, and is based on a fairly superficial understanding of the ``lsst.verify`` data model.
+A more detailed design should be included in `DMTN-203 <https://dmtn-203.lsst.io/>`__.
 
 Saving provenance in dataset files
 ----------------------------------
 
-TODO:
+- *[REC-FIL-1] Serialised exported data products (FITS files in the requirements) should include file metadata (e.g. FITS header) that allows someone in possession of the file to come to our services and query for additional provenance information for that artifact (e.g. pipeline-task level provenance).*
 
-- Sketch hook on Formatter that is given metadata to write if it can and discard if it can't.
-- On `put`, pass metadata to Formatter with UUID of the dataset, and best (conservative) guess at UUIDs of actual inputs to this quantum.
-- THIS MIGHT DIFFER FROM FINAL ACTUAL INPUTS, because the quantum isn't necessarily done yet (though it often will be).  Or should we record predicted/available inputs instead to avoid discrepancy?
+Low-level I/O for files written by the butler goes through the ``lsst.daf.butler.Formatter`` interface, which could be easily extended to include external ``dict``-like metadata that should be recorded in the file.
+That metadata should be passed through a new optional keyword argument to ``Butler.put``, and can be prepared by the execution system to include provenance information.
+As implied by the recommendation text, this could only be implemented in formatters that use data formats that can store flexible metadata, but this should be true in practice for any data format used for public data products (including FITS, Parquet, and JSON).
+
+To satisfy *[REC-FIL-1]*, all we need to store is the dataset's UUID, which (after implementing the design described in [:ref:`recording-provenance`]) will be available to the execution system for insertion into the provenance metadata when the dataset is first saved to disk.
+It would be easy and possibly useful to also save the UUID of the producing quantum, and it may be worth also recording the UUIDs of all datasets input to the quantum (grouped by dataset type) as well, to possibly avoid the need for full provenance queries in the simplest cases.
+This may be less useful than it seems or perhaps even slightly confusing in some cases, however, because:
+
+- as of the time a dataset is written, we can only reliably know the "available" inputs to the quantum; the task may *later* declare that only some of these inputs were actually used;
+- in a few cases (large gather-scatter sequence points in the graph), the number of inputs to the quantum may be large (in the case of FGCM, a full-survey sequence point, it will be enormous);
+- there is no guarantee that the datasets directly input (as opposed to transitively used as inputs via some predecessor quantum's outputs) to a quantum constitute scientifically interesting provenance.
+
+At this time, it seems prudent to save only the dataset and quantum UUIDs, absent a clear use case for saving more.
+
+- *[REC-FIL-2] A study should be made of the possibility of embedding a DataLink or other service pointer in the FITS header in lieu of representing the provenance graph in the file.*
+
+The formatter hook described in the previous subsection would clearly be capable of embedding such a link in the file when it is first written, but doing so effectively declares that the service pointer can
+
+- be calculated from some combination of information (dataset UUID, data ID, dataset type, ``RUN`` collection, URI(s)) known to the execution system or formatter;
+- be assumed to remain static over the lifetime of the file.
+
+These seem like dangerous assumptions, in that satisfying them probably either creates unwanted dependencies between software components (the execution system has to be configured to know about RSP service endpoints) or puts undesirable constraints on others.
+
+Injecting this metadata into files when they are retrieved seems much cleaner conceptually, but it may rule out simple and/or efficient approaches to data access that would otherwise be on the table.
+We would not consider this kind of implementation of this recommendation to be a middleware responsibility.
+
+Provenance recommendations not directly relevant to middleware
+--------------------------------------------------------------
+
+To the extent that these recommendations describe best practices or conventions, we believe middleware provenance systems will be consistent with them, but they do not directly map to any current or planned functionality.
+
+- *[REC-EXP-3] Any system (eg. LOVE, OLE/OWL) allowing the entering or modification of exposure-level ancillary data should collect provenance information on that data (who, what, why).*
+- *[REQ-TEL-001] Investigate ways to expose all information in the Camera Control System Database to the EFD.*
+- *[REQ-TEL-002] The MMSs should ideally have an API and at the very least a machine-readable export of data that would allow its data to be retrieved by other systems.*
+- *[REQ-TEL-003] Any new CSCs (and wherever possible any current CSCs that lack them) should have requirements on what provenance information they should make available to SAL so it can be associated with their telemetry.*
+- *[REC-SW-1] There are a number of extant versioning mechanisms in DM and T&S software environments. Care should be to not proliferate those unreasonably but to share software versioning and packaging infrastructure where possible. As these systems are hard to get right, the more teams use them, the more robust they tend to be.*
+- *[REC-SW-2] All systems should have individual explicit requirements addressing what, if any, demands there are to be able to recover a prior system state. When such requirements are needed, the systems should have to capture and publish in a machine-readable form, version information that is necessary to fulfil those requirements. Such requirements should cover the need for data model provenance, eg. whether it is necessary to know when a particular schema was applied to a running system.*
+- *[REC-SW-4] Containerization offers significant and tangible advantages in software reproducibility for a modest investment in build/deploy infrastructure; it should be preferred wherever possible for new systems, and systems that predate the move to containerization should be audited to examine whether there is a reasonable path to integrate them to current deployment practices.*
+- *[REC-FIL-3] Irrespective of ongoing design discussions, every attempt should be made to capture information that could later be used to populate a provenance service.*
+- *[REC-SRC-001] Perform a census of produced and planned flags to ensure that 64 bits for sources and 128 bits for objects are sufficient within a generous margin of error. This activity should also be carried out for DIASources and DIAObjects source IDs.*
+- *[REC-SRC-002] We are concerned that merely encoding a 4-bit data release provenance in a source does not scale to commissioning needs and the project should decide whether it is acceptable for additional information beyond the source ID to be required to fully associate a source with a specific image.*
+- *[REC-SRC-003] More generally, a study should be conducted on whether 64 bit source IDs are sufficient.*
+- *[REC-SRC-004] Although not provenance-related, we recommend that the DPDD be updated to clearly state whether footprints and heavy footprints are to be provided.*
+- *[REC-MET-004] A plan should be developed for persisting metrics that are not directly associated with Butler-persisted data.*
+- *[REC-LOG-1] Since time is the primary provenance element for a log entry, systems are to produce (or make searchable) in UTC.*
+- *[REC-LOG-2] Each site (summit, IDF, USDF, UKDF, FRDF) should provide a log management solution or dispatch to another site’s log management service to aid log discoverability.*
+- *[REC-LOG-3] Individual systems should make clear log retention requirements.*
+
 
 .. rubric:: References
 
