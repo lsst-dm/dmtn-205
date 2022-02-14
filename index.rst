@@ -54,13 +54,17 @@ Before moving on, it is worth pointing out a few smaller issues with the provena
 - Batch execution with BPS may "cluster" multiple quanta into a single "job" to e.g. avoid overheads in acquiring compute nodes or allow local scratch space to be used for some intermediate datasets.
   We currently have no way to store job-level provenance in a data repository, except by denormalizing it into per-quantum datasets.
 
+.. _saving-complete-quantum-provenance:
+
 Saving complete quantum provenance
 ==================================
+
+.. _provenance-schema:
 
 Representing executed quanta in Registry
 ----------------------------------------
 
-Proposed tables for storing quantum-based provenance in the registry database are shown in the diagram below [`source <https://dbdiagram.io/d/61fff3cc85022f4ee5479e62>`_]:
+Proposed tables for storing quantum-based provenance in the registry database are shown in the diagram below [`source <https://dbdiagram.io/d/61fff3cc85022f4ee5479e62>`__]:
 
 .. image:: /_static/tables.png
    :target: https://dbdiagram.io/d/61fff3cc85022f4ee5479e62
@@ -85,7 +89,7 @@ Tasks are not associated with a particular collection, and are uniquely identifi
 .. note::
 
    It may make more sense to make task labels non-unique, except within a particular collection, in order to allow the label to have different meanings in different pipelines or change its definition more easily over time.
-   This would analogous to the `RFC-804 <https://jira.lsstcorp.org/browse/RFC-804>`_ proposal for dataset type non-uniqueness, however, and as long as dataset type names *are* globally unique, and task labels are used to produce dataset type names (e.g. ``<label>_metadata`` or ``<label>_config``), there's relatively little to be gained from making label uniqueness apply only within a collection.
+   This would analogous to the `RFC-804 <https://jira.lsstcorp.org/browse/RFC-804>`__ proposal for dataset type non-uniqueness, however, and as long as dataset type names *are* globally unique, and task labels are used to produce dataset type names (e.g. ``<label>_metadata`` or ``<label>_config``), there's relatively little to be gained from making label uniqueness apply only within a collection.
    The definition of those dataset types (which must be globally unique) would still effectively force global label uniqueness.
 
 Links between quanta and their inputs datasets are stored in the ``quantum_inputs`` table.
@@ -141,7 +145,7 @@ Recording provenance during execution
 Avoiding per-dataset or per-quantum communication with a central SQL database is absolutely critical for at-scale execution with our middleware, so the provenance described above will need to be saved to files at first and loaded into the database later.
 
 Most of the information we need to save is already included in the ``QuantumGraph`` produced prior to execution, especially if we include UUIDs for its predicted intermediate and output in the graph at construction.
-We are already planning to do this for other reasons, as described in the `"Quantum-backed butler" proposal in DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`_.
+We are already planning to do this for other reasons, as described in the `"Quantum-backed butler" proposal in DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`__.
 Always saving the graph to a managed location during any kind of execution (not just BPS) is thus a key piece of being able to load provenance into the database later.
 
 The remaining information that is only available during/after execution of a quantum is
@@ -168,6 +172,8 @@ The full high-level design will be the subject of a future technote, but an earl
 
 Recording provenance only when using BPS (and relying on it to manage the ``QuantumGraph`` and provenance files) in the interim seems like a good first step.
 Extending the design to include non-BPS processing may take time, but we do not anticipate it changing what happens at a low level or the appearance of persisted provenance information.
+
+.. _querying-provenance:
 
 Interfaces for querying quantum provenance
 ------------------------------------------
@@ -258,6 +264,8 @@ It is worth noting that these queries are not affected by the original boundarie
    These multi-``RUN`` provenance ``QuantumGraphs`` cannot be translated one-to-one into runnable predicted ``QuantumGraphs``, as long as our execution model expects all writes to go into a single output ``RUN`` collection with consistent configuration and versions for all quanta within it.
    The most straightforward way to address this would be to make the process that translates provenance graphs into predicted graphs a fundamentally one-to-many operation, requiring users to run each per-``RUN`` predicted graph on its own.
    For unrelated reasons (e.g. RSP service outputs, user-defined processing, unusual processing for commissioning), we are considering expanding the data ID / dimensions system to allow custom data ID keys or relax the dataset type + data ID unique constraints, which would also open up new ways of saving configuration (e.g. multiple init quanta per ``RUN``, each with its own config datasets), and that may in enable execution of ``QuantumGraph`` objects with heterogeneous configuration.
+
+.. _ivoa-mapping:
 
 Mapping to the IVOA provenance model
 ------------------------------------
