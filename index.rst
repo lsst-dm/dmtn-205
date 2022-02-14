@@ -461,6 +461,24 @@ To the extent that these recommendations describe best practices or conventions,
 - *[REC-LOG-2] Each site (summit, IDF, USDF, UKDF, FRDF) should provide a log management solution or dispatch to another site’s log management service to aid log discoverability.*
 - *[REC-LOG-3] Individual systems should make clear log retention requirements.*
 
+Implementation notes
+====================
+
+This technote should be mined for Jira epics and stories after it has been reviewed by stakeholders, but we can comment now on how to sequence the implementation of the quantum-level provenance that is its primary focus:
+
+1. implementing the quantum-backed butler design from `DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`__ (see tickets attached to `DM-32072 <https://jira.lsstcorp.org/browse/DM-32072>`__).
+   This will set up up the overall data flow needed for provenance recording, at least when BPS is used.
+2. Design Python classes for representing "already executed" ``Quantum`` and ``QuantumGraph`` objects (which will entail changes to the existing "predicted" variants of these, including the introduction of "init" quanta), and start writing these when quantum-backed butler is used in execution (i.e. when BPS is used).
+   This should include serialization compatible with writing executed quanta to the per-quantum files written by the quantum-backed butler (probably via Pydantic/JSON).
+3. Add ``Registry`` support for *storing* quantum-level provenance, using the schema proposed here, possibly with modifications identified in the previous step (which is why that step is worth doing first).
+   This probably needs to include simple quantum query support for testing purposes, but it shouldn't need to include the more complicated graph traversal system.
+   Perform schema migrations in major repositories.
+4. Update the BPS "bring home" job to ingest provenance from quantum-backed butler's per-quantum files into the registry.
+5. Add full ``Registry`` support for querying provenance, including graph traversal.
+6. Extend ``pipetask`` (or replacement tools) to write provenance to the registry when running outside of BPS as well, and include predicted ``QuantumGraph`` objects and quantum-backed butler output files in a new third butler component.
+   This needs a much more complete design that is beyond of this technote.
+
+The sequencing becomes less clear for later steps, but generally this allows us to start writing provenance as early as possible in the most important context (BPS execution).
 
 .. rubric:: References
 
