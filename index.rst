@@ -388,16 +388,7 @@ This is already the case for the fields used as examples in this recommendation.
 
 - *[REC-EXP-2] As planned, OCS queue submissions that result in meaningfully grouped observations should be identified as such in the Butler.*
 
-The middleware does currently read a group ID field from the raw headers and store it in the ``exposure`` table.
-We also have a ``visit``-definition scheme that interprets the group ID as a way to relate the snaps that correspond to a single visit, for on-sky science observations only (in the butler dimensions model, a ``visit`` may only be defined for on-sky data).
-
-While that makes this recommendation is formally satisfied, this approach has two (related) problems:
-
-- Using group ID to connect snaps to visits leaves us without a way to create more flexible groups of science exposures.
-- The association of group ID with visits also discourages using group ID for more flexible groups of non-science exposures, such as focus sweeps or flat sequences, or causes confusion about whether visits (or some new visit-like dimension) should be defined and used for these.
-
-It would be much better for a new snap-specific header key to be introduced and interpreted by the middleware, freeing up the group ID to have more flexible and ad-hoc definitions.
-We believe this change is already ticketed in the data acquisition systems, but the work is not yet complete.
+This has been implemented by :jira:`DM-33602` and :jira:`DM-30948`.
 
 Metrics linkage
 ---------------
@@ -405,8 +396,9 @@ Metrics linkage
 - *[REC-MET-001] For metrics that can be associated with a Butler dataId, the metrics should be persisted using the Data Butler as the source of truth. The dataId associated with the metric should use the full granularity.*
 - *[REC-MET-002] Any system that uses Butler data to derive metrics should persist them in the Butler provided that the metrics are associable with a Data ID.*
 
-This is already implemented and in regular use in the ``faro`` package in particular, and is currently the only way that metrics derived from butler data are initially stored.
-It is arguable whether the butler datasets are considered the source of truth after upload to SQuaSH.
+This is already implemented and in regular use in the ``faro`` and ``analysis_tools`` packages, and is currently the only way that metrics derived from butler data are initially stored.
+It is arguable whether the butler datasets are considered the source of truth after upload to SQuaSH (:cite:`SQR-008`).
+:cite:`DMTN-203` will explore these details more fully.
 
 - *[REC-MET-003] When lsst.verify.Job objects are exported, the exported object should include the needed information (run collection and dataId) to associate with the source of truth metric persisted with the Data Butler.*
 
@@ -424,6 +416,7 @@ This will be easier if we can normalize the content in metric datasets with what
 - Each ``lsst.verify.Metric`` can be mapped directly to a butler dataset type, so there should be no need for a metric measurement to store its ``Metric`` internally.
 - The opaque blobs associated with an ``lsst.verify.Measurement`` should probably be factored out into separate butler datasets with different dataset types when measurements are stored in the butler.
 - An ``lsst.verify.Job`` is a container for a group of measurements, and is probably best not mapped directly to anything stored by the butler, but a higher-level factory for ``Job`` instances that uses the butler to query for and fetch measurements and blob data may be useful, especially as a way to upload to SQuaSH.
+(Note that these ``Job`` types have no relation to the BPS job concept.)
 
 This mapping is very much preliminary, and is based on a fairly superficial understanding of the ``lsst.verify`` data model.
 A more detailed design should be included in :cite:`DMTN-203`.
