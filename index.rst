@@ -130,7 +130,7 @@ Recording provenance during execution
 Avoiding per-dataset or per-quantum communication with a central SQL database is absolutely critical for at-scale execution with our middleware, so the provenance described above will need to be saved to files at first and loaded into the database later.
 
 Most of the information we need to save is already included in the ``QuantumGraph`` produced prior to execution, especially if we include UUIDs for its predicted intermediate and output in the graph at construction.
-We are already planning to do this for other reasons, as described in the `"Quantum-backed butler" proposal in DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`__.
+We are already planning to do this for other reasons, as described in the "Quantum-backed butler" proposal in :cite:`DMTN-177`.
 Always saving the graph to a managed location during any kind of execution (not just BPS) is thus a key piece of being able to load provenance into the database later.
 
 The remaining information that is only available during/after execution of a quantum is
@@ -319,7 +319,7 @@ We currently have no concept that maps to IVOA's "Agent" or any of its relations
 Addressing provenance working group recommendations
 ===================================================
 
-Italicized bullets in this section are specific recommendations quoted from `DMTN-185 <http://dmtn-185.lsst.io>`__.
+Italicized bullets in this section are specific recommendations quoted from :cite:`DMTN-185`.
 Middleware responses are in regular text below.
 
 Recommendations relevant to quantum provenance
@@ -418,7 +418,7 @@ It might make more sense for metric values persisted to butler data repositories
 We currently save metric measurements as individual JSON files, which is convenient for upload to SQuaSH but inconvenient for querying metric values via the butler.
 It also precludes using thresholds on metric values at criteria in ``QuantumGraph`` generation.
 A custom ``Datastore`` backed by by either the ``Registry`` "opaque table" system or SQuaSH itself (along with ``Registry`` query system extensions) would make butler queries against metrics much more convenient and efficient.
-`DMTN-203 <https://dmtn-203.lsst.io/>`__ will provide more detail on this subject.
+:cite:`DMTN-203` will provide more detail on this subject.
 This will be easier if we can normalize the content in metric datasets with what is in the ``Registry`` and generally make them smaller and more consistent, in essence unifying the ``lsst.verify`` data model with the butler one:
 
 - Each ``lsst.verify.Metric`` can be mapped directly to a butler dataset type, so there should be no need for a metric measurement to store its ``Metric`` internally.
@@ -426,7 +426,7 @@ This will be easier if we can normalize the content in metric datasets with what
 - An ``lsst.verify.Job`` is a container for a group of measurements, and is probably best not mapped directly to anything stored by the butler, but a higher-level factory for ``Job`` instances that uses the butler to query for and fetch measurements and blob data may be useful, especially as a way to upload to SQuaSH.
 
 This mapping is very much preliminary, and is based on a fairly superficial understanding of the ``lsst.verify`` data model.
-A more detailed design should be included in `DMTN-203 <https://dmtn-203.lsst.io/>`__.
+A more detailed design should be included in :cite:`DMTN-203`.
 
 Saving provenance in dataset files
 ----------------------------------
@@ -486,7 +486,7 @@ Implementation notes
 
 This technote should be mined for Jira epics and stories after it has been reviewed by stakeholders, but we can comment now on how to sequence the implementation of the quantum-level provenance that is its primary focus:
 
-1. implementing the quantum-backed butler design from `DMTN-177 <https://dmtn-177.lsst.io/#limited-quantum-backed-butler>`__ (see tickets attached to `DM-32072 <https://jira.lsstcorp.org/browse/DM-32072>`__).
+1. implementing the quantum-backed butler design from :cite:`DMTN-177` (see tickets attached to :jira:`DM-32072`).
    This will set up up the overall data flow needed for provenance recording, at least when BPS is used.
 2. Design Python classes for representing "already executed" ``Quantum`` and ``QuantumGraph`` objects (which will entail changes to the existing "predicted" variants of these, including the introduction of "init" quanta), and start writing these when quantum-backed butler is used in execution (i.e. when BPS is used).
    This should include serialization compatible with writing executed quanta to the per-quantum files written by the quantum-backed butler (probably via Pydantic/JSON).
