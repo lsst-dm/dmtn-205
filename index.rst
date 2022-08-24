@@ -148,7 +148,7 @@ These provenance files could easily play that role as well.
 
 Our proposal is to only load provenance into the ``Registry`` database if the execution system has at least attempted to run them.
 Quanta whose executions were blocked by failures in upstream quanta would not be included, even if present in the original ``QuantumGraph``.
-This leaves room for them to be added ny later submissions of the same graph (or subsets thereof) without any UUID conflicts.
+This leaves room for them to be added by later submissions of the same graph (or subsets thereof) without any UUID conflicts.
 
 The quantum-backed butler design is a solution to a problem unique to at-scale batch processing, so writing the ``QuantumGraph`` and datastore-records files to BPS-managed locations (such as its "submit" directory) there is completely fine.
 That's not true for provenance, which we want to work regardless of how execution is performed.
@@ -251,6 +251,10 @@ Most common provenance queries could be satisfied by the following predicates an
 - whether the quantum's task label is in a given set;
 - whether any input or output dataset type is in given set;
 - whether any input or output dataset UUID is in a given set.
+- whether the quantum or any input dataset is part of a particular RUN collection.
+
+It's also worth considering variants of this interface that are given a single callback object with multiple methods, with ways for that object to control not just whether to proceed forward or backward but which dataset connections to follow in detail.
+
 
 It is worth noting here that the ``Quantum`` and ``QuantumGraph`` objects returned here are not necessarily the same types as those used prior to execution; execution adds more information that we want the provenance system to be able to return.
 Whether to actually use different types involves a lot of classic software design tradeoffs involving inheritance and container classes, and resolving it is beyond the scope of this document.
@@ -308,7 +312,7 @@ Because this role will be the same for all relationships between a particular da
 IVOA recommends certain predefined values be used for those descriptions when they apply (e.g. "Calibration" as a "UsedDescription"), which could be identified by configuration that depends on the pipeline definition.
 
 IVOA also defines a "WasInformedBy" relationship between two Activities and a "WasDerivedFrom" relationship between two Entities.
-These may be useful in collapsed views of the ``QuantumGraph`` in which datasets or quanta are elided, but in our case they ca always be computed from the Activity-Entity/quantum-dataset relationships, rather than being graphs we would store directly.
+These may be useful in collapsed views of the ``QuantumGraph`` in which datasets or quanta are elided, but in our case they can always be computed from the Activity-Entity/quantum-dataset relationships, rather than being graphs we would store directly.
 
 IVOA has no direct counterpart to our "predicted" vs. "available" vs "actual" categorization of quantum-dataset relationships.
 Because a relationship can have at most one associated "GeneratedDescription" or "UsedDescription", we cannot use one set of description types for the role-like information and another for this categorization.
@@ -402,15 +406,16 @@ It is arguable whether the butler datasets are considered the source of truth af
 
 - *[REC-MET-003] When lsst.verify.Job objects are exported, the exported object should include the needed information (run collection and dataId) to associate with the source of truth metric persisted with the Data Butler.*
 
-It is at least unusual for butler datasets to store their own data ID and especially their own ``RUN`` collection internally.
+At prsent it is unusual for butler datasets to store their own data ID and especially their own ``RUN`` collection internally, but this is something expect to do more in the future (see discussion on *REC-FIL-1* below).
 It might make more sense for metric values persisted to butler data repositories to be saved as a dataset that does not have this state, and for the system that exports it to SQuaSH to combine the dataset content with the data ID and ``RUN`` collection from the ``Registry``.
 
 - *[REC-MET-005] Even if effort for implementation is not available in construction, we should develop a conceptual design for structured, semantically rich storage of metrics in the Butler.*
 
-We currently save metric measurements as individual JSON files, which is convenient for upload to SQuaSH but inconvenient for querying metric values via the butler.
+We currently save metric measurements as individual YAML files, which is convenient for upload to SQuaSH but inconvenient for querying metric values via the butler.
+We are in the midst of a transition to a format that stores multiple metric measurements in a single JSON dataset, which is much more efficient but no better for queries.
 It also precludes using thresholds on metric values at criteria in ``QuantumGraph`` generation.
 A custom ``Datastore`` backed by by either the ``Registry`` "opaque table" system or SQuaSH itself (along with ``Registry`` query system extensions) would make butler queries against metrics much more convenient and efficient.
-:cite:`DMTN-203` will provide more detail on this subject.
+:cite:`DMTN-203` will again provide more detail on this subject.
 This will be easier if we can normalize the content in metric datasets with what is in the ``Registry`` and generally make them smaller and more consistent, in essence unifying the ``lsst.verify`` data model with the butler one:
 
 - Each ``lsst.verify.Metric`` can be mapped directly to a butler dataset type, so there should be no need for a metric measurement to store its ``Metric`` internally.
@@ -428,10 +433,10 @@ Saving provenance in dataset files
 
 Low-level I/O for files written by the butler goes through the ``lsst.daf.butler.Formatter`` interface, which could be easily extended to include external ``dict``-like metadata that should be recorded in the file.
 That metadata should be passed through a new optional keyword argument to ``Butler.put``, and can be prepared by the execution system to include provenance information.
-As implied by the recommendation text, this could only be implemented in formatters that use data formats that can store flexible metadata, but this should be true in practice for any data format used for public data products (including FITS, Parquet, and JSON).
+As implied by the recommendation text, this could only be implemented in formatters that use data formats that can store flexible metadata, but this should be true in practice for any data format used for public data products (including FITS, Parquet, and JSON, provided this external metadata can be cleanly separated from the file content itself).
 
-To satisfy *[REC-FIL-1]*, all we need to store is the dataset's UUID, which (after implementing the design described in [:ref:`recording-provenance`]) will be available to the execution system for insertion into the provenance metadata when the dataset is first saved to disk.
-It would be easy and possibly useful to also save the UUID of the producing quantum, and it may be worth also recording the UUIDs of all datasets input to the quantum (grouped by dataset type) as well, to possibly avoid the need for full provenance queries in the simplest cases.
+To satisfy *[REC-FIL-1]*, all we need to store is the dataset's UUID, which (after implementing the design described in [:ref:`recording-provenance`]) will be available to the execution system for insertion into the provenance metadata when the dataset is first saved to disk, and quite easy to pass into the code that actually writes the files.
+It might be useful to also save the UUID of the producing quantum, and it may be worth also recording the UUIDs of all datasets input to the quantum (grouped by dataset type) as well, to possibly avoid the need for full provenance queries in the simplest cases.
 This may be less useful than it seems or perhaps even slightly confusing in some cases, however, because:
 
 - as of the time a dataset is written, we can only reliably know the "available" inputs to the quantum; the task may *later* declare that only some of these inputs were actually used;
