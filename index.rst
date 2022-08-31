@@ -82,7 +82,7 @@ We use this dataset's collections and data IDs as those of the quantum itself.
 This dataset does not need to include all provenance information related to the quantum; the execution system can chose to write arbitrary additional information (e.g. logs) to different dataset types that are related to the quantum in the same way as its regular output datasets (these are still identifiable as special via their dataset types).
 The ``${TASK}_quantum`` dataset should not appear as a regular output of the quantum, and it should not be used as an input by any downstream task.
 The ``host``, ``status``, and ``timespan_*`` columns of the ``quantum`` table provide basic metadata about the execution that we consider likely to be search criteria in provenance queries.
-The ``original_id`` columns provides the original UUID for quanta whose executions failed, as described below in :ref:`failures_and_retries`.
+The ``original_id`` column provides the original UUID for quanta whose executions failed, as described below in :ref:`failures_and_retries`.
 
 Tasks are not associated with a particular collection, and are uniquely identified by their label (just like dataset types); this means they represent a particular set of task configurations in pipelines that share this label, and have a many-to-one relationship with actual Python ``PipelineTask`` types.
 
@@ -406,7 +406,7 @@ It is arguable whether the butler datasets are considered the source of truth af
 
 - *[REC-MET-003] When lsst.verify.Job objects are exported, the exported object should include the needed information (run collection and dataId) to associate with the source of truth metric persisted with the Data Butler.*
 
-At prsent it is unusual for butler datasets to store their own data ID and especially their own ``RUN`` collection internally, but this is something expect to do more in the future (see discussion on *REC-FIL-1* below).
+At present it is unusual for butler datasets to store their own data ID and especially their own ``RUN`` collection internally, but this is something we expect to do more often in the future (see discussion on *REC-FIL-1* below).
 It might make more sense for metric values persisted to butler data repositories to be saved as a dataset that does not have this state, and for the system that exports it to SQuaSH to combine the dataset content with the data ID and ``RUN`` collection from the ``Registry``.
 
 - *[REC-MET-005] Even if effort for implementation is not available in construction, we should develop a conceptual design for structured, semantically rich storage of metrics in the Butler.*
