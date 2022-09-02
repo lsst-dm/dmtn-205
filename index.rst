@@ -45,7 +45,7 @@ Before moving on, it is worth pointing out a few issues with the provenance that
   This is both fragile and incompatible with our plans to distribute Data Release processing across multiple Data Facilities, unless we just prohibit that kind of ``RUN`` collection extension or do enumerate all relevant software somehow up front.
 
 - The approach of using datasets to record arbitrary provenance for higher-level tooling is currently extensible only to the extent that those datasets can use existing storage classes.
-  New storage classes must currently be registered by editing configuration in the data repository or ``daf_butler`` manually.
+  New storage classes must currently be registered by editing configuration in the data repository, in ``daf_butler`` itself, or in a location given by an environment variable; while the latter *may* provide a way to handle user-defined storage classes gracefully, we have not yet identified environment-management practices for this, and at present it is expected that developers modify the default configuration in ``daf_butler``.
   This is a problem for much more than just provenance, however (it also limits pipeline extensibility), and is something we hope to resolve.
 
 - Using ``CHAINED`` collections to link input collections to output collections is often assumed to relate input and output datasets that share the same data ID (or have related data IDs).
