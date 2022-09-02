@@ -1,9 +1,9 @@
 % bibentry template for lsst.bib in https://github.com/lsst/lsst-texmf/blob/master/texmf/bibtex/bib/lsst.bib
 
 @DocuShare{DMTN-205,
-   author = { Tim Jenness },
+   author = { Jim Bosch, Tim Jenness, Michelle Gower, Andy Salnikov },
     title = {Tracking Provenance in Butler},
-     year = 2021,
+     year = 2022,
     month = Sep,
    handle = {DMTN-205},
       url = {https://dmtn-205.lsst.io } }
