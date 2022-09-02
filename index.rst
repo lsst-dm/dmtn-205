@@ -4,15 +4,6 @@
 
 .. sectnum::
 
-.. TODO: Delete the note below before merging new content to the master branch.
-
-.. note::
-
-   **This technote is not yet published.**
-
-   The butler stores datasets in collections along with software versions and pipeline configuration, but it does not store any information about the datasets that were used to generate a specific dataset. This document will discuss the plan for integrating provenance into Butler, sufficient to be able to regenerate any given dataset. It will refer to the requirements for provenance gathering specified in DMTN-185.
-
-
 Existing concepts and mechanisms for provenance
 ===============================================
 
